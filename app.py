@@ -9,8 +9,6 @@ import streamlit as st
 
 st.set_page_config(page_title="IFCCI Santa & Troll", layout="centered")
 
-# ⚠️ 关键更新：这里必须包含所有 16 个人的名字
-# 必须与 draw_results.json 中的名字完全一致
 PARTICIPANTS = [
     "Dato’ Kingston", "Datin Paris", "Wena", "Zi Qing", "Zhen Hao", 
     "Jeffrey", "Klain", "Daniel Ang", "Kingston Neo", "Kimberly", 
@@ -28,13 +26,16 @@ def load_results():
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
                 results = json.load(f)
-    except Exception:
-        results = {}
+    except Exception as e:
+        # ⚠️ 关键修改：如果出错，直接在网页上显示红色报错信息！
+        st.error(f"🔥 数据文件读取严重错误！请检查 draw_results.json 格式。错误详情: {e}")
+        # 这里不返回空，避免覆盖，让用户意识到问题
+        return {} 
     
-    # 补全所有人，确保新加的人也在字典里
+    # 补全所有人
     full_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
-    # 使用读取到的文件覆盖初始字典（保留已抽签结果）
-    full_map.update(results)
+    if results:
+        full_map.update(results)
     return full_map
 
 def save_results(results):
@@ -47,7 +48,9 @@ def save_results(results):
 
 # 初始化 Session State
 if 'RESULT_MAP' not in st.session_state:
-    st.session_state.RESULT_MAP = load_results()
+    loaded_data = load_results()
+    # 只有当成功读取到数据时才赋值，否则如果是空字典（报错了），尽量不要覆盖
+    st.session_state.RESULT_MAP = loaded_data
 
 # 初始化“当前展示结果的人”
 if 'show_result_for' not in st.session_state:
@@ -58,23 +61,18 @@ RESULT_MAP = st.session_state.RESULT_MAP
 # --- 3. 抽签算法与特效 ---
 
 def get_candidate_list(operator_name, draw_type):
-    """获取合法的候选人名单（排除自己 + 排除已被抽中的人）"""
     current_data = st.session_state.RESULT_MAP
     candidates = set(PARTICIPANTS) - {operator_name}
-    
-    # 排除掉已经被抽中的人
     excluded_targets = set()
     for _, result in current_data.items():
         target = result.get(draw_type)
         if target is not None:
             excluded_targets.add(target)
-            
     final_candidates = list(candidates - excluded_targets)
     random.shuffle(final_candidates) 
     return final_candidates
 
 def run_wheel_effect(placeholder, candidates, duration=1.5):
-    """运行滚动抽奖特效"""
     if not candidates: return
     end_time = time.time() + duration
     delay = 0.08 
@@ -136,7 +134,6 @@ with st.sidebar:
 
 st.markdown('<div class="main-title">🎄 IFCCI Santa & Troll 😈</div>', unsafe_allow_html=True)
 
-# 🟢 分支 A: 结果展示模式
 if st.session_state.show_result_for:
     winner = st.session_state.show_result_for
     data = RESULT_MAP.get(winner, {})
@@ -163,10 +160,8 @@ if st.session_state.show_result_for:
         st.session_state.show_result_for = None 
         st.rerun() 
 
-# 🔵 分支 B: 抽签选择模式
 else:
-    # 核心逻辑：筛选出还没完成抽签的人
-    # 只要 'troll' 不是 None，就说明这人抽过了，不放入列表
+    # 筛选未完成者
     uncompleted = [p for p in PARTICIPANTS if RESULT_MAP.get(p, {}).get('troll') is None]
     
     progress = len(PARTICIPANTS) - len(uncompleted)
@@ -176,7 +171,6 @@ else:
     st.markdown("---")
     st.subheader("请选择您的名字：")
     
-    # 下拉菜单只显示 uncompleted 列表里的人
     options = ["-- 点击选择 --"] + uncompleted
     selected_name = st.selectbox("Name", options=options, label_visibility="collapsed")
     
