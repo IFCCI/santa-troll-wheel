@@ -112,12 +112,12 @@ if st.session_state.show_result_for:
     st.markdown(f"""
     <div class="result-card">
     <div style="font-size:50px;">🎅</div>
-    <div class="role-title">你的 Santa 对象</div>
+    <div class="role-title">恭喜你，成为 TA 的Santa</div>
     <div class="name-display">{data.get('santa', '???')}</div>
-    <div style="color:#666; font-size:14px;">(记得准备礼物!)</div>
+    <div style="color:#666; font-size:14px;">(要送 TA 想要的礼物哦!)</div>
     <div class="divider"></div>
     <div style="font-size:50px;">😈</div>
-    <div class="role-title">你的 Troll 对象</div>
+    <div class="role-title">恭喜你，成为 TA 的Troll</div>
     <div class="name-display">{data.get('troll', '???')}</div>
     <div style="color:#666; font-size:14px;">(准备好恶搞 TA 吧!)</div>
     </div>
@@ -183,3 +183,4 @@ else:
             # 关键：设置 Session State，锁定结果页
             st.session_state.show_result_for = selected_name
             st.rerun()
+
