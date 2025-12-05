@@ -108,19 +108,18 @@ if st.session_state.show_result_for:
     
     st.markdown(f"<h3 style='text-align:center'>👋 {winner}，你的抽签结果</h3>", unsafe_allow_html=True)
     
+    # --- 修复部分：删除了多余空行和缩进，防止被识别为代码块 ---
     st.markdown(f"""
     <div class="result-card">
-        <div style="font-size:50px;">🎅</div>
-        <div class="role-title">你的 Santa 对象</div>
-        <div class="name-display">{data.get('santa', '???')}</div>
-        <div style="color:#666; font-size:14px;">(记得准备礼物!)</div>
-        
-        <div class="divider"></div>
-        
-        <div style="font-size:50px;">😈</div>
-        <div class="role-title">你的 Troll 对象</div>
-        <div class="name-display">{data.get('troll', '???')}</div>
-        <div style="color:#666; font-size:14px;">(准备好恶搞 TA 吧!)</div>
+    <div style="font-size:50px;">🎅</div>
+    <div class="role-title">你的 Santa 对象</div>
+    <div class="name-display">{data.get('santa', '???')}</div>
+    <div style="color:#666; font-size:14px;">(记得准备礼物!)</div>
+    <div class="divider"></div>
+    <div style="font-size:50px;">😈</div>
+    <div class="role-title">你的 Troll 对象</div>
+    <div class="name-display">{data.get('troll', '???')}</div>
+    <div style="color:#666; font-size:14px;">(准备好恶搞 TA 吧!)</div>
     </div>
     """, unsafe_allow_html=True)
     
