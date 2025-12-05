@@ -32,26 +32,34 @@
         "troll": null
     },
     "Kingston Neo": {
-        "santa": null,
-        "troll": null
+        "santa": "Kimberly",
+        "troll": "Klain"
     },
     "Kimberly": {
-        "santa": null,
-        "troll": null
+        "santa": "Klain",
+        "troll": "Hanshon"
     },
     "Hanshon": {
-        "santa": null,
-        "troll": null
+        "santa": "Jeffrey",
+        "troll": "Cassey"
     },
     "Cassey": {
-        "santa": null,
-        "troll": null
+        "santa": "Zi Qing",
+        "troll": "Kimberly"
     },
     "Bryan": {
+        "santa": "Datin Paris",
+        "troll": "Zi Qing"
+    },
+    "Melissa": {
+        "santa": "Kingston Neo",
+        "troll": "Daniel Ang"
+    }
+        "Cosmos": {
         "santa": null,
         "troll": null
     },
-    "Melissa": {
+    "Yuan Ni": {
         "santa": null,
         "troll": null
     }
