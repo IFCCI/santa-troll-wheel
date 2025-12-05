@@ -1,8 +1,8 @@
 import random
 import json
 import os
-import streamlit as st
 import time
+import streamlit as st
 
 # --- 1. 核心数据 ---
 
@@ -20,86 +20,53 @@ STORAGE_FILE = 'draw_results.json'
 
 def load_results():
     """
-    从文件中加载已有的抽签结果，如果文件不存在或损坏则返回初始化字典。
-    同时，它也会确保所有 PARTICIPANTS 都存在于 map 中。
+    从文件中加载已有的抽签结果。
     """
     results = {}
     try:
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
                 results = json.load(f)
-        else:
-            # 文件不存在，Streamlit 首次运行会写入一个包含预设数据的初始文件
-            pass 
-    except json.JSONDecodeError:
-        st.error("⚠️ 警告: 结果文件损坏，已使用初始数据重置结果。")
-        results = {}
-    except FileNotFoundError:
-        # 文件找不到，继续使用初始数据
+    except Exception as e:
+        # 如果文件出错，使用空字典防止程序崩溃
         results = {}
     
-    # 确保所有人都存在于 ResultMap 中 (使用初始数据或修复)
-    initial_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
-    initial_map.update(results)
-    return initial_map
+    # 确保所有人都存在于字典中，防止 Key Error
+    full_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
+    full_map.update(results)
+    return full_map
 
 def save_results(results):
     """
-    将抽签结果保存到文件，并更新 Session State。
-    BUG FIX: 移除了 st.experimental_rerun()，让它只在按钮点击逻辑末尾触发。
+    只负责保存数据到文件，不负责刷新页面。
     """
-    with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=4)
-    st.session_state.RESULT_MAP = results
+    try:
+        with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(results, f, ensure_ascii=False, indent=4)
+        st.session_state.RESULT_MAP = results
+    except Exception as e:
+        st.error(f"保存失败: {e}")
 
+# 初始化 Session State
+if 'RESULT_MAP' not in st.session_state:
+    st.session_state.RESULT_MAP = load_results()
 
-# --- 3. 应用程序初始化 ---
-
-# 确保在第一次运行时，文件系统中有初始的预设结果。
-def initialize_app_data():
-    """在 Streamlit 应用启动时，确保 Session State 和 JSON 文件就位。"""
-    if 'RESULT_MAP' not in st.session_state:
-        # 预设数据 (包含已完成的 Wena, Jeffrey, Zi Qing, Zhen Hao, Klain)
-        initial_data = {
-            "Dato’ Kingston": {"santa": None, "troll": None},
-            "Datin Paris": {"santa": None, "troll": None},
-            "Wena": {"santa": "Bryan", "troll": "Dato’ Kingston"},
-            "Zi Qing": {"santa": "Zhen Hao", "troll": "Jeffrey"},
-            "Zhen Hao": {"santa": "Dato’ Kingston", "troll": "Kingston Neo"},
-            "Jeffrey": {"santa": "Wena", "troll": "Zhen Hao"},
-            "Klain": {"santa": "Daniel Ang", "troll": "Melissa"},
-            "Daniel Ang": {"santa": None, "troll": None},
-            "Kingston Neo": {"santa": None, "troll": None},
-            "Kimberly": {"santa": None, "troll": None},
-            "Hanshon": {"santa": None, "troll": None},
-            "Cassey": {"santa": None, "troll": None},
-            "Bryan": {"santa": None, "troll": None},
-            "Melissa": {"santa": None, "troll": None}
-        }
-        
-        # 首次加载时，尝试写入初始数据文件，防止文件不存在
-        if not os.path.exists(STORAGE_FILE):
-            save_results(initial_data)
-        
-        st.session_state.RESULT_MAP = load_results()
-
-initialize_app_data()
 RESULT_MAP = st.session_state.RESULT_MAP
 
-# --- 4. 核心算法函数 ---
+# --- 3. 核心算法函数 ---
 
 def get_candidate_list(operator_name, draw_type):
     """
     根据抽签类型 (santa 或 troll) 动态生成候选名单。
     """
-    results = st.session_state.RESULT_MAP
+    current_data = st.session_state.RESULT_MAP
     
     # 1. 排除操作者本人
     candidates = set(PARTICIPANTS) - {operator_name}
 
-    # 2. 排除已成为目标的人
+    # 2. 排除已成为该类型(santa/troll)目标的人
     excluded_targets = set()
-    for _, result in results.items():
+    for _, result in current_data.items():
         target = result.get(draw_type)
         if target is not None:
             excluded_targets.add(target)
@@ -115,142 +82,139 @@ def spin_wheel(operator_name, draw_type):
     candidates = get_candidate_list(operator_name, draw_type)
 
     if not candidates:
-        st.error(f"❌ {draw_type.upper()} 候选名单为空！无法抽签。")
         return None
 
-    drawn_name = random.choice(candidates)
-    return drawn_name
+    return random.choice(candidates)
 
-# --- 5. Streamlit UI/主程序 ---
+# --- 4. Streamlit UI (界面逻辑) ---
 
-# --- UI 美化部分 ---
-st.set_page_config(page_title="🎄 IFCCI Santa & Troll 抽签轮盘", layout="centered", initial_sidebar_state="collapsed")
+# 设置页面配置
+st.set_page_config(page_title="IFCCI Santa & Troll", layout="centered")
 
-# 增加一些 CSS 来自定义样式
+# 自定义 CSS 美化
 st.markdown("""
     <style>
-    .big-title {
-        font-size: 36px !important;
+    .main-title {
+        font-size: 32px;
         font-weight: bold;
-        color: #ff4b4b; /* 圣诞红 */
+        color: #D42426; /* 圣诞红 */
         text-align: center;
-        margin-bottom: 0px;
+        margin-bottom: 10px;
     }
-    .subtitle {
-        font-size: 24px !important;
-        font-weight: bold;
-        color: #008000; /* 圣诞绿 */
-        text-align: center;
-        margin-top: 0px;
-        margin-bottom: 20px;
-    }
-    .stSelectbox label {
+    .sub-title {
         font-size: 18px;
-        font-weight: bold;
-        color: #333333;
+        color: #165B33; /* 圣诞绿 */
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .success-box {
+        padding: 20px;
+        background-color: #f0f9f0;
+        border-radius: 10px;
+        border: 2px solid #165B33;
+        text-align: center;
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="big-title">🎄 IFCCI Santa & Troll 抽签轮盘 😈</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">请选择您的名字，点击按钮进行抽签！</p>', unsafe_allow_html=True)
-st.markdown("---")
+# 标题
+st.markdown('<div class="main-title">🎄 IFCCI Santa & Troll 抽签 😈</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">请选择您的名字，抽取您的送礼对象和恶搞对象！</div>', unsafe_allow_html=True)
 
-
-# 筛选出尚未完成抽签的人员列表 (Santa 或 Troll 任一为 None)
+# --- 计算未完成抽签的人员名单 ---
+# 只有当 'troll' 还没抽出来时，才算未完成
 uncompleted_participants = [
     p for p in PARTICIPANTS 
     if RESULT_MAP.get(p, {}).get('troll') is None
 ]
-completed_participants = len(PARTICIPANTS) - len(uncompleted_participants)
 
-# 状态显示
-st.info(f"✅ 已完成抽签人数: **{completed_participants} / {len(PARTICIPANTS)}**")
+# 显示进度条或文字
+progress = len(PARTICIPANTS) - len(uncompleted_participants)
+st.progress(progress / len(PARTICIPANTS))
+st.caption(f"当前进度: {progress} / {len(PARTICIPANTS)} 人已完成")
+
 st.markdown("---")
 
-# --- 步骤 1: 选择操作者 ---
-st.subheader("请选择您的名字：")
+# --- 选择名字 ---
+st.subheader("我是...")
 
-# 选项只包含未完成抽签的人员
-operator_options = ["--请选择您的名字--"] + uncompleted_participants
+# 下拉菜单选项：默认提示 + 未完成的人
+options = ["-- 请选择您的名字 --"] + uncompleted_participants
 
-operator = st.selectbox(
-    "选择您的名字",
-    options=operator_options,
-    index=0,
+selected_name = st.selectbox(
+    "选择名字",
+    options=options,
     label_visibility="collapsed"
 )
 
-if operator != "--请选择您的名字--":
-    st.markdown(f"### 您选择了: **{operator}**")
-    st.markdown("---")
+# --- 抽签主逻辑 ---
+if selected_name != "-- 请选择您的名字 --":
+    st.markdown(f"### 👋 你好, {selected_name}")
     
-    current_result = RESULT_MAP.get(operator, {})
-    is_completed = current_result.get('troll') is not None # 只要 Troll 抽完，就视为完成
-
-    if is_completed:
-        st.success(f"🎉 **{operator}，您已完成抽签！**")
-        st.metric("您的 Santa 对象是", current_result['santa'])
-        st.metric("您的 Troll 对象是", current_result['troll'])
+    # 获取当前人的数据
+    my_result = RESULT_MAP.get(selected_name, {})
+    my_santa = my_result.get('santa')
+    my_troll = my_result.get('troll')
+    
+    # 判断是否完全完成
+    if my_santa and my_troll:
+        st.markdown(f"""
+        <div class="success-box">
+            <h3>🎉 您已完成抽签！</h3>
+            <p>🎅 您的 Santa 对象: <strong>{my_santa}</strong></p>
+            <p>😈 您的 Troll 对象: <strong>{my_troll}</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
         st.balloons()
-        st.warning("请记住您的对象，祝您圣诞快乐！")
+    
     else:
-        # --- 步骤 2 & 3: 抽签按钮 ---
-        st.markdown("点击下面的按钮开始抽签，您将抽到一位 Santa 对象和一位 Troll 对象。")
-        if st.button("🎁 开始我的抽签 😈", type="primary", use_container_width=True):
+        # 还没完成，显示抽签按钮
+        st.info("点击下方按钮，系统将为您同时抽取 Santa 和 Troll。")
+        
+        if st.button("🎁 开始 IFCCI 抽签 😈", type="primary", use_container_width=True):
             
-            # --- Santa 抽签逻辑 ---
-            drawn_santa = current_result.get('santa')
-            
-            if drawn_santa is None:
-                st.subheader("🎅 抽 Santa Wheel...")
-                with st.spinner("正在为您抽取 Santa 对象..."):
-                    time.sleep(1) # 模拟抽签过程
-                    drawn_santa = spin_wheel(operator, 'santa')
-
-                if drawn_santa:
-                    st.success(f"🎉 Santa 对象抽中: **{drawn_santa}** (您将送礼物给 Ta!)")
-                    current_result['santa'] = drawn_santa
-                else:
-                    st.error("未能抽取 Santa 对象。")
+            # 1. 抽 Santa
+            if not my_santa:
+                with st.spinner("🎅 正在寻找 Santa 对象..."):
+                    time.sleep(1.5) # 增加一点紧张感
+                    drawn_santa = spin_wheel(selected_name, 'santa')
+                    if drawn_santa:
+                        my_result['santa'] = drawn_santa
+                        st.success(f"🎅 Santa 对象: {drawn_santa}")
+                    else:
+                        st.error("无法抽取 Santa (候选人不足)")
+                        st.stop()
             else:
-                st.info(f"您的 Santa 对象已是: **{drawn_santa}**")
-                
-            # 如果 Santa 抽中，继续抽 Troll
-            drawn_troll = current_result.get('troll')
-            if drawn_santa and drawn_troll is None:
-                st.markdown("---")
-                st.subheader("😈 抽 Troll Wheel...")
-                with st.spinner("正在为您抽取 Troll 对象..."):
-                    time.sleep(1) # 模拟抽签过程
+                st.info(f"🎅 Santa 对象已存在: {my_santa}")
+
+            # 2. 抽 Troll
+            if not my_result.get('troll'):
+                with st.spinner("😈 正在寻找 Troll 对象..."):
+                    time.sleep(1.5)
                     
-                    drawn_troll = None
-                    attempts = 0 
-                    
-                    while attempts < 10:
-                        drawn_troll = spin_wheel(operator, 'troll')
-                        
-                        if drawn_troll is None:
-                            st.error("无法找到 Troll 候选人。")
+                    # 尝试抽取，确保不重复
+                    found_troll = None
+                    for _ in range(10): # 尝试10次防止死循环
+                        temp_troll = spin_wheel(selected_name, 'troll')
+                        # 规则：Troll 不能和 Santa 是同一个人
+                        if temp_troll != my_result['santa']:
+                            found_troll = temp_troll
                             break
+                    
+                    if found_troll:
+                        my_result['troll'] = found_troll
+                        st.error(f"😈 Troll 对象: {found_troll}")
+                    else:
+                        st.error("无法抽取 Troll (候选人冲突或不足)")
+                        # 如果 Troll 失败，不保存 Santa，允许重试（可选）
+                        st.stop()
 
-                        if drawn_troll == drawn_santa:
-                            st.warning(f"❗❗ 警告：抽中的 Troll ({drawn_troll}) 与 Santa ({drawn_santa}) 重复了。自动重抽...")
-                            attempts += 1
-                            continue 
-                        
-                        # 抽签成功
-                        st.error(f"😈 Troll 对象抽中: **{drawn_troll}** (您将恶搞 Ta!)")
-                        current_result['troll'] = drawn_troll
-                        break
-                
-                if drawn_troll:
-                    st.success("恭喜您完成抽签！")
-                    st.balloons()
-                    st.warning("请记住您的对象，祝您圣诞快乐！")
-                else:
-                    st.error("未能抽取 Troll 对象。")
-
-            # 无论 Santa 还是 Troll 完成，保存结果，然后强制页面刷新来更新下拉列表和状态。
+            # 3. 保存并刷新
+            # 更新内存中的数据
+            RESULT_MAP[selected_name] = my_result
+            # 保存到文件
             save_results(RESULT_MAP)
-            st.experimental_rerun()
+            
+            st.success("✅ 抽签完成！结果已保存。")
+            time.sleep(1) # 让用户看一眼结果再刷新
+            st.rerun()
