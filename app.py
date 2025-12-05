@@ -9,7 +9,8 @@ import streamlit as st
 
 st.set_page_config(page_title="IFCCI Santa & Troll", layout="centered")
 
-# 更新：添加了 Cosmos 和 Yuan Ni，现在共 16 人
+# ⚠️ 关键更新：这里必须包含所有 16 个人的名字
+# 必须与 draw_results.json 中的名字完全一致
 PARTICIPANTS = [
     "Dato’ Kingston", "Datin Paris", "Wena", "Zi Qing", "Zhen Hao", 
     "Jeffrey", "Klain", "Daniel Ang", "Kingston Neo", "Kimberly", 
@@ -21,7 +22,7 @@ STORAGE_FILE = 'draw_results.json'
 # --- 2. 状态管理函数 ---
 
 def load_results():
-    """加载数据，确保安全"""
+    """加载数据"""
     results = {}
     try:
         if os.path.exists(STORAGE_FILE):
@@ -30,9 +31,9 @@ def load_results():
     except Exception:
         results = {}
     
-    # 补全所有人 (包括新加的 Cosmos 和 Yuan Ni)
-    # 这一步会保留 results 里已有的数据，并为新名字初始化为 None
+    # 补全所有人，确保新加的人也在字典里
     full_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
+    # 使用读取到的文件覆盖初始字典（保留已抽签结果）
     full_map.update(results)
     return full_map
 
@@ -48,7 +49,7 @@ def save_results(results):
 if 'RESULT_MAP' not in st.session_state:
     st.session_state.RESULT_MAP = load_results()
 
-# 初始化“当前展示结果的人”，防止刷新后消失
+# 初始化“当前展示结果的人”
 if 'show_result_for' not in st.session_state:
     st.session_state.show_result_for = None
 
@@ -57,14 +58,17 @@ RESULT_MAP = st.session_state.RESULT_MAP
 # --- 3. 抽签算法与特效 ---
 
 def get_candidate_list(operator_name, draw_type):
-    """获取合法的候选人名单"""
+    """获取合法的候选人名单（排除自己 + 排除已被抽中的人）"""
     current_data = st.session_state.RESULT_MAP
     candidates = set(PARTICIPANTS) - {operator_name}
+    
+    # 排除掉已经被抽中的人
     excluded_targets = set()
     for _, result in current_data.items():
         target = result.get(draw_type)
         if target is not None:
             excluded_targets.add(target)
+            
     final_candidates = list(candidates - excluded_targets)
     random.shuffle(final_candidates) 
     return final_candidates
@@ -87,7 +91,6 @@ def run_wheel_effect(placeholder, candidates, duration=1.5):
 st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #D42426; text-align: center; margin-bottom: 5px; }
-    .sub-title { font-size: 16px; color: #165B33; text-align: center; margin-bottom: 20px; }
     .result-card {
         padding: 30px;
         border-radius: 20px;
@@ -113,16 +116,12 @@ with st.sidebar:
     st.header("🔐 管理员后台")
     admin_pwd = st.text_input("输入管理员密码查看结果", type="password")
     
-    # 设置你的简单密码，比如 'admin123'
     if admin_pwd == "admin888": 
         st.success("已解锁")
         st.write("### 📊 实时抽签结果")
-        
-        # 转换为 DataFrame 方便查看
         df = pd.DataFrame.from_dict(RESULT_MAP, orient='index')
         st.dataframe(df)
         
-        # 下载按钮
         json_str = json.dumps(RESULT_MAP, ensure_ascii=False, indent=4)
         st.download_button(
             label="📥 下载结果 (JSON)",
@@ -130,8 +129,6 @@ with st.sidebar:
             file_name="final_results.json",
             mime="application/json"
         )
-        
-        # 统计进度
         completed_count = len([p for p in PARTICIPANTS if RESULT_MAP[p]['troll']])
         st.metric("完成人数", f"{completed_count} / {len(PARTICIPANTS)}")
 
@@ -139,7 +136,7 @@ with st.sidebar:
 
 st.markdown('<div class="main-title">🎄 IFCCI Santa & Troll 😈</div>', unsafe_allow_html=True)
 
-# 🟢 分支 A: 如果有正在展示的结果，锁定画面显示结果卡片
+# 🟢 分支 A: 结果展示模式
 if st.session_state.show_result_for:
     winner = st.session_state.show_result_for
     data = RESULT_MAP.get(winner, {})
@@ -166,9 +163,12 @@ if st.session_state.show_result_for:
         st.session_state.show_result_for = None 
         st.rerun() 
 
-# 🔵 分支 B: 正常抽签页面
+# 🔵 分支 B: 抽签选择模式
 else:
+    # 核心逻辑：筛选出还没完成抽签的人
+    # 只要 'troll' 不是 None，就说明这人抽过了，不放入列表
     uncompleted = [p for p in PARTICIPANTS if RESULT_MAP.get(p, {}).get('troll') is None]
+    
     progress = len(PARTICIPANTS) - len(uncompleted)
     st.caption(f"当前进度: {progress} / {len(PARTICIPANTS)} 人已完成")
     st.progress(progress / len(PARTICIPANTS))
@@ -176,6 +176,7 @@ else:
     st.markdown("---")
     st.subheader("请选择您的名字：")
     
+    # 下拉菜单只显示 uncompleted 列表里的人
     options = ["-- 点击选择 --"] + uncompleted
     selected_name = st.selectbox("Name", options=options, label_visibility="collapsed")
     
