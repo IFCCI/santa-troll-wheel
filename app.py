@@ -2,6 +2,7 @@ import random
 import json
 import os
 import time
+import pandas as pd
 import streamlit as st
 
 # --- 1. 核心配置与数据 ---
@@ -67,30 +68,18 @@ def get_candidate_list(operator_name, draw_type):
     return final_candidates
 
 def run_wheel_effect(placeholder, candidates, duration=1.5):
-    """
-    运行滚动抽奖特效
-    placeholder: Streamlit 的占位符，用于更新文字
-    candidates: 候选人列表，用于随机跳动
-    duration: 动画持续时间（秒）
-    """
-    if not candidates:
-        return
-        
+    """运行滚动抽奖特效"""
+    if not candidates: return
     end_time = time.time() + duration
-    # 模拟转盘速度：开始快，后面也不变（为了简单流畅），如果想变慢可以加 sleep 递增
     delay = 0.08 
-    
     while time.time() < end_time:
-        # 随机显示一个名字
         temp_name = random.choice(candidates)
-        # 使用 HTML 渲染大号字体，模拟跳动效果
         placeholder.markdown(
             f"<div style='font-size:30px; font-weight:bold; color:#FF9900; text-align:center;'>🎰 {temp_name}</div>", 
             unsafe_allow_html=True
         )
         time.sleep(delay)
-    
-    placeholder.empty() # 动画结束后清空
+    placeholder.empty()
 
 # --- 4. CSS 美化 ---
 st.markdown("""
@@ -117,11 +106,36 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">🎄 IFCCI Santa & Troll 😈</div>', unsafe_allow_html=True)
+# --- 5. 管理员后台 (Sidebar) ---
+with st.sidebar:
+    st.header("🔐 管理员后台")
+    admin_pwd = st.text_input("输入管理员密码查看结果", type="password")
+    
+    # 设置你的简单密码，比如 'admin123'
+    if admin_pwd == "admin888": 
+        st.success("已解锁")
+        st.write("### 📊 实时抽签结果")
+        
+        # 转换为 DataFrame 方便查看
+        df = pd.DataFrame.from_dict(RESULT_MAP, orient='index')
+        st.dataframe(df)
+        
+        # 下载按钮
+        json_str = json.dumps(RESULT_MAP, ensure_ascii=False, indent=4)
+        st.download_button(
+            label="📥 下载结果 (JSON)",
+            data=json_str,
+            file_name="final_results.json",
+            mime="application/json"
+        )
+        
+        # 统计进度
+        completed_count = len([p for p in PARTICIPANTS if RESULT_MAP[p]['troll']])
+        st.metric("完成人数", f"{completed_count} / {len(PARTICIPANTS)}")
 
-# ==========================================
-#  逻辑分支：展示结果页 vs 抽签选择页
-# ==========================================
+# --- 6. 主界面逻辑 ---
+
+st.markdown('<div class="main-title">🎄 IFCCI Santa & Troll 😈</div>', unsafe_allow_html=True)
 
 # 🟢 分支 A: 如果有正在展示的结果，锁定画面显示结果卡片
 if st.session_state.show_result_for:
@@ -146,14 +160,12 @@ if st.session_state.show_result_for:
     
     st.balloons()
     
-    # 这个按钮点击后，才会清除状态，回到主页
     if st.button("✅ 我记住了，下一位", type="primary", use_container_width=True):
-        st.session_state.show_result_for = None # 清除状态
-        st.rerun() # 刷新回到主页
+        st.session_state.show_result_for = None 
+        st.rerun() 
 
 # 🔵 分支 B: 正常抽签页面
 else:
-    # 计算进度
     uncompleted = [p for p in PARTICIPANTS if RESULT_MAP.get(p, {}).get('troll') is None]
     progress = len(PARTICIPANTS) - len(uncompleted)
     st.caption(f"当前进度: {progress} / {len(PARTICIPANTS)} 人已完成")
@@ -171,45 +183,31 @@ else:
         if st.button("🎁 点击开始抽签 😈", type="primary", use_container_width=True):
             current_result = RESULT_MAP.get(selected_name, {})
             
-            # --- 抽签逻辑 ---
-            
             # 1. 抽 Santa
             if not current_result.get('santa'):
-                # 获取候选人列表用于特效
                 santa_candidates = get_candidate_list(selected_name, 'santa')
                 if not santa_candidates:
                     st.error("Santa 候选人不足！")
                     st.stop()
                 
-                # 创建一个空容器用于播放动画
                 anim_box = st.empty()
                 st.info("🎅 正在抽取 Santa...")
-                # 播放 1.5 秒动画
                 run_wheel_effect(anim_box, santa_candidates, duration=1.5)
                 
-                # 真正的抽取
                 s_res = random.choice(santa_candidates)
                 current_result['santa'] = s_res
             
             # 2. 抽 Troll
             if not current_result.get('troll'):
-                # 获取候选人列表用于特效
-                # 注意：Troll 的候选人稍微复杂点，需要排除掉刚抽到的 Santa
-                # 为了特效简单，我们先获取所有合法 Troll，虽然可能包含刚抽到的 Santa，但只是视觉特效无所谓
-                # 只要最后真正的逻辑排除掉就行
                 troll_candidates_visual = get_candidate_list(selected_name, 'troll')
-                
                 anim_box_2 = st.empty()
                 st.info("😈 正在抽取 Troll...")
                 run_wheel_effect(anim_box_2, troll_candidates_visual, duration=1.5)
                 
                 found_troll = None
-                # 尝试多次以避开和 Santa 重复
                 for _ in range(20):
-                    # 获取真实的候选人池
                     real_candidates = get_candidate_list(selected_name, 'troll')
                     if not real_candidates: break
-                    
                     t_res = random.choice(real_candidates)
                     if t_res != current_result['santa']:
                         found_troll = t_res
@@ -220,10 +218,7 @@ else:
                     st.stop()
                 current_result['troll'] = found_troll
 
-            # 3. 保存并进入展示模式
             RESULT_MAP[selected_name] = current_result
             save_results(RESULT_MAP)
-            
-            # 关键：设置 Session State，锁定结果页
             st.session_state.show_result_for = selected_name
             st.rerun()
