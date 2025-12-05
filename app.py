@@ -9,10 +9,11 @@ import streamlit as st
 
 st.set_page_config(page_title="IFCCI Santa & Troll", layout="centered")
 
+# 更新：添加了 Cosmos 和 Yuan Ni，现在共 16 人
 PARTICIPANTS = [
     "Dato’ Kingston", "Datin Paris", "Wena", "Zi Qing", "Zhen Hao", 
     "Jeffrey", "Klain", "Daniel Ang", "Kingston Neo", "Kimberly", 
-    "Hanshon", "Cassey", "Bryan", "Melissa"
+    "Hanshon", "Cassey", "Bryan", "Melissa", "Cosmos", "Yuan Ni"
 ]
 
 STORAGE_FILE = 'draw_results.json'
@@ -29,7 +30,8 @@ def load_results():
     except Exception:
         results = {}
     
-    # 补全所有人
+    # 补全所有人 (包括新加的 Cosmos 和 Yuan Ni)
+    # 这一步会保留 results 里已有的数据，并为新名字初始化为 None
     full_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
     full_map.update(results)
     return full_map
