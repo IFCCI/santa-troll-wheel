@@ -13,9 +13,6 @@ PARTICIPANTS = [
 ]
 
 # 存储文件路径
-# 在 Streamlit Cloud 中，应用实例会重启，文件系统写入是临时的
-# 对于这种游戏，我们依赖文件写入，但如果应用长时间不活跃或 Streamlit 容器重启，数据会重置。
-# 对于一次性活动或短期游戏，这是可接受的。
 STORAGE_FILE = 'draw_results.json'
 
 # --- 2. 文件和状态管理 ---
@@ -34,7 +31,6 @@ def load_results():
     
     # 确保所有人都存在于 ResultMap 中
     initial_map = {p: {"santa": None, "troll": None} for p in PARTICIPANTS}
-    # 用加载的结果覆盖初始 map
     initial_map.update(results)
     return initial_map
 
@@ -42,10 +38,10 @@ def save_results(results):
     """将抽签结果保存到文件，并更新 Session State。"""
     with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
-    st.session_state.RESULT_MAP = results # 更新 session state 中的 RESULT_MAP
+    st.session_state.RESULT_MAP = results
     st.experimental_rerun() # 重新运行脚本以更新界面状态
 
-# 使用 Streamlit Session State 来保持状态，这是在 Web 应用中管理数据流的关键
+# 使用 Streamlit Session State 来保持状态
 if 'RESULT_MAP' not in st.session_state:
     st.session_state.RESULT_MAP = load_results()
 
@@ -86,37 +82,78 @@ def spin_wheel(operator_name, draw_type):
 
 # --- 4. Streamlit UI/主程序 ---
 
-st.set_page_config(page_title="🎄 Santa & Troll 抽签轮盘", layout="centered", initial_sidebar_state="collapsed")
-st.title("🎄 Santa & Troll 抽签轮盘")
+# --- UI 美化部分 ---
+st.set_page_config(page_title="🎄 IFCCI Santa & Troll 抽签轮盘", layout="centered", initial_sidebar_state="collapsed")
+
+# 增加一些 CSS 来自定义样式
+st.markdown("""
+    <style>
+    .big-title {
+        font-size: 36px !important;
+        font-weight: bold;
+        color: #ff4b4b; /* 圣诞红 */
+        text-align: center;
+        margin-bottom: 0px;
+    }
+    .subtitle {
+        font-size: 24px !important;
+        font-weight: bold;
+        color: #008000; /* 圣诞绿 */
+        text-align: center;
+        margin-top: 0px;
+        margin-bottom: 20px;
+    }
+    .stSelectbox label {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333333;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown('<p class="big-title">🎄 IFCCI Santa & Troll 抽签轮盘 😈</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">请选择您的名字，点击按钮进行抽签！</p>', unsafe_allow_html=True)
 st.markdown("---")
 
-# 显示当前已完成抽签人数
 RESULT_MAP = st.session_state.RESULT_MAP
-completed_participants = [p for p in PARTICIPANTS if RESULT_MAP.get(p, {}).get('troll') is not None]
-st.info(f"✅ 已完成抽签人数: **{len(completed_participants)} / {len(PARTICIPANTS)}**")
+
+# 筛选出尚未完成抽签的人员列表 (Santa 或 Troll 任一为 None)
+uncompleted_participants = [
+    p for p in PARTICIPANTS 
+    if RESULT_MAP.get(p, {}).get('santa') is None or RESULT_MAP.get(p, {}).get('troll') is None
+]
+completed_participants = len(PARTICIPANTS) - len(uncompleted_participants)
+
+# 状态显示
+st.info(f"✅ 已完成抽签人数: **{completed_participants} / {len(PARTICIPANTS)}**")
 st.markdown("---")
 
 # --- 步骤 1: 选择操作者 ---
-st.subheader("请选择您的名字开始抽签：")
+st.subheader("请选择您的名字：")
+
+# 选项只包含未完成抽签的人员
+operator_options = ["--请选择您的名字--"] + uncompleted_participants
+
 operator = st.selectbox(
     "选择您的名字",
-    options=["--请选择--"] + PARTICIPANTS,
+    options=operator_options,
     index=0,
     label_visibility="collapsed"
 )
 
-if operator != "--请选择--":
+if operator != "--请选择您的名字--":
     st.markdown(f"### 您选择了: **{operator}**")
     st.markdown("---")
     
     current_result = RESULT_MAP.get(operator, {})
-    is_completed = current_result.get('troll') is not None
+    is_completed = current_result.get('troll') is not None # 只要 Troll 抽完，就视为完成
 
     if is_completed:
+        # 如果用户选择了一个虽然没有在下拉列表，但数据中已完成的人（比如有人手动输入或 URL 传入），则显示结果
         st.success(f"🎉 **{operator}，您已完成抽签！**")
         st.metric("您的 Santa 对象是", current_result['santa'])
         st.metric("您的 Troll 对象是", current_result['troll'])
-        st.balloons() # 庆祝气球动画
+        st.balloons()
         st.warning("请记住您的对象，祝您圣诞快乐！")
     else:
         # --- 步骤 2 & 3: 抽签按钮 ---
@@ -125,31 +162,35 @@ if operator != "--请选择--":
             
             # --- Santa 抽签逻辑 ---
             drawn_santa = current_result.get('santa')
+            
             if drawn_santa is None:
-                with st.spinner("🎅 正在为您抽取 Santa 对象..."):
+                st.subheader("🎅 抽 Santa Wheel...")
+                with st.spinner("正在为您抽取 Santa 对象..."):
                     import time
                     time.sleep(2) # 模拟抽签过程
                     drawn_santa = spin_wheel(operator, 'santa')
 
                 if drawn_santa:
-                    st.success(f"🎉 您的 Santa 对象抽中: **{drawn_santa}** (您将送礼物给 Ta!)")
+                    st.success(f"🎉 Santa 对象抽中: **{drawn_santa}** (您将送礼物给 Ta!)")
                     current_result['santa'] = drawn_santa
                 else:
-                    st.error("由于未知错误，未能抽取 Santa 对象。请稍后再试。")
+                    st.error("未能抽取 Santa 对象。")
             else:
                 st.info(f"您的 Santa 对象已是: **{drawn_santa}**")
                 
             # 如果 Santa 抽中，继续抽 Troll
-            if drawn_santa and current_result.get('troll') is None:
+            drawn_troll = current_result.get('troll')
+            if drawn_santa and drawn_troll is None:
                 st.markdown("---")
-                with st.spinner("😈 正在为您抽取 Troll 对象..."):
+                st.subheader("😈 抽 Troll Wheel...")
+                with st.spinner("正在为您抽取 Troll 对象..."):
                     import time
                     time.sleep(2) # 模拟抽签过程
                     
                     drawn_troll = None
                     attempts = 0 
                     
-                    while attempts < 10: # 最多重试10次
+                    while attempts < 10:
                         drawn_troll = spin_wheel(operator, 'troll')
                         
                         if drawn_troll is None:
@@ -162,7 +203,7 @@ if operator != "--请选择--":
                             continue 
                         
                         # 抽签成功
-                        st.error(f"😈 您的 Troll 对象抽中: **{drawn_troll}** (您将恶搞 Ta!)")
+                        st.error(f"😈 Troll 对象抽中: **{drawn_troll}** (您将恶搞 Ta!)")
                         current_result['troll'] = drawn_troll
                         break
                 
@@ -171,7 +212,7 @@ if operator != "--请选择--":
                     st.balloons()
                     st.warning("请记住您的对象，祝您圣诞快乐！")
                 else:
-                    st.error("由于未知错误，未能抽取 Troll 对象。请稍后再试。")
+                    st.error("未能抽取 Troll 对象。")
 
             # 无论 Santa 还是 Troll 完成，都保存结果并刷新页面
             save_results(RESULT_MAP)
