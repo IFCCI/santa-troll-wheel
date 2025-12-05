@@ -1,0 +1,58 @@
+{
+    "Dato’ Kingston": {
+        "santa": null,
+        "troll": null
+    },
+    "Datin Paris": {
+        "santa": null,
+        "troll": null
+    },
+    "Wena": {
+        "santa": "Bryan",
+        "troll": "Dato’ Kingston"
+    },
+    "Zi Qing": {
+        "santa": "Zhen Hao",
+        "troll": "Jeffrey"
+    },
+    "Zhen Hao": {
+        "santa": "Dato’ Kingston",
+        "troll": "Kingston Neo"
+    },
+    "Jeffrey": {
+        "santa": "Wena",
+        "troll": "Zhen Hao"
+    },
+    "Klain": {
+        "santa": "Daniel Ang",
+        "troll": "Melissa"
+    },
+    "Daniel Ang": {
+        "santa": null,
+        "troll": null
+    },
+    "Kingston Neo": {
+        "santa": null,
+        "troll": null
+    },
+    "Kimberly": {
+        "santa": null,
+        "troll": null
+    },
+    "Hanshon": {
+        "santa": null,
+        "troll": null
+    },
+    "Cassey": {
+        "santa": null,
+        "troll": null
+    },
+    "Bryan": {
+        "santa": null,
+        "troll": null
+    },
+    "Melissa": {
+        "santa": null,
+        "troll": null
+    }
+}
